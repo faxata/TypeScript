@@ -42,7 +42,7 @@ namespace ts.projectSystem {
             const et = new TestServerEventManager([...files, notIncludedFile, tsconfig]);
             et.service.openClientFile(files[0].path);
             et.assertProjectInfoTelemetryEvent({
-                fileStats: { ts: 2, tsx: 1, js: 1, jsx: 1, dts: 1 },
+                fileStats: fileStats({ ts: 2, tsx: 1, js: 1, jsx: 1, dts: 1 }),
                 compilerOptions,
                 include: true,
             });
@@ -233,6 +233,17 @@ namespace ts.projectSystem {
                 },
                 languageServiceEnabled: false,
             });
+        });
+
+        it("aaa", () => { //name
+            //const ajs = makeFile("/a.js", "// @ts-check");
+            //const bjs = makeFile("/b.js", "");
+            const et = new TestServerEventManager([]);//[ajs, bjs]);
+            et.host.writeFile(ts.server.openFileStatsFileName("/global-typings-cache"), JSON.stringify({ js: 13, checkJs: 10 }));
+            //et.service.openClientFile(ajs.path);
+            //et.service.openClientFile(bjs.path);
+            et.getEvent<server.ProjectLanguageServiceStateEvent>(server.ProjectLanguageServiceStateEvent);
+            et.assertOpenFilesTelemetryEvent({ js: 13, checkJs: 10 });
         });
     });
 

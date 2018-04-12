@@ -213,7 +213,7 @@ namespace ts.projectSystem {
         }
 
         assertProjectInfoTelemetryEvent(partial: Partial<server.ProjectInfoTelemetryEventData>, configFile?: string): void {
-            assert.deepEqual(this.getEvent<server.ProjectInfoTelemetryEvent>(server.ProjectInfoTelemetryEvent), {
+            assert.deepEqual<server.ProjectInfoTelemetryEventData>(this.getEvent<server.ProjectInfoTelemetryEvent>(server.ProjectInfoTelemetryEvent), {
                 projectId: Harness.mockHash(configFile || "/tsconfig.json"),
                 fileStats: fileStats({ ts: 1 }),
                 compilerOptions: {},
@@ -233,6 +233,10 @@ namespace ts.projectSystem {
                 version,
                 ...partial,
             });
+        }
+
+        assertOpenFilesTelemetryEvent(stats: server.OpenFileStats): void {
+            assert.deepEqual<server.OpenFilesInfoTelemetryEventData>(this.getEvent<server.OpenFilesInfoTelemetryEvent>(server.OpenFilesInfoTelemetryEvent), { stats });
         }
     }
 
@@ -2753,7 +2757,7 @@ namespace ts.projectSystem {
             const session = createSession(host, {
                 canUseEvents: true,
                 eventHandler: e => {
-                    if (e.eventName === server.ConfigFileDiagEvent || e.eventName === server.ProjectsUpdatedInBackgroundEvent || e.eventName === server.ProjectInfoTelemetryEvent) {
+                    if (e.eventName === server.ConfigFileDiagEvent || e.eventName === server.ProjectsUpdatedInBackgroundEvent || e.eventName === server.ProjectInfoTelemetryEvent || e.eventName === server.OpenFilesInfoTelemetryEvent) {
                         return;
                     }
                     assert.equal(e.eventName, server.ProjectLanguageServiceStateEvent);

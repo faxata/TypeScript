@@ -80,11 +80,15 @@ namespace ts.server {
         return !arrayIsEqualTo(imports1, imports2);
     }
 
-    /*@internal*/
+    /** @internal */
     export class TypingsCache {
         private readonly perProjectCache: Map<TypingsCacheEntry> = createMap<TypingsCacheEntry>();
 
         constructor(private readonly installer: ITypingsInstaller) {
+        }
+
+        get globalTypingsCacheLocation(): string {
+            return this.installer.globalTypingsCacheLocation;
         }
 
         isKnownTypesPackageName(name: string): boolean {

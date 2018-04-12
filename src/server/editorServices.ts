@@ -6,6 +6,7 @@ namespace ts.server {
     export const ConfigFileDiagEvent = "configFileDiag";
     export const ProjectLanguageServiceStateEvent = "projectLanguageServiceState";
     export const ProjectInfoTelemetryEvent = "projectInfo";
+    export const OpenFilesInfoTelemetryEvent = "openFilesInfo";
     // tslint:enable variable-name
 
     export interface ProjectsUpdatedInBackgroundEvent {
@@ -55,6 +56,15 @@ namespace ts.server {
         readonly version: string;
     }
 
+    export interface OpenFilesInfoTelemetryEvent {
+        readonly eventName: typeof OpenFilesInfoTelemetryEvent;
+        readonly data: OpenFilesInfoTelemetryEventData;
+    }
+
+    export interface OpenFilesInfoTelemetryEventData {
+        readonly stats: OpenFileStats;
+    }
+
     export interface ProjectInfoTypeAcquisitionData {
         readonly enable: boolean;
         // Actual values of include/exclude entries are scrubbed.
@@ -70,7 +80,13 @@ namespace ts.server {
         readonly dts: number;
     }
 
-    export type ProjectServiceEvent = ProjectsUpdatedInBackgroundEvent | ConfigFileDiagEvent | ProjectLanguageServiceStateEvent | ProjectInfoTelemetryEvent;
+    export interface OpenFileStats {
+        readonly js: number; // # '.js' files that were opened in the previous session
+        readonly checkJs: number; // # of those with `// @ts-check`
+    }
+    const openFileStatsKeys: ReadonlyArray<keyof OpenFileStats> = ["js", "checkJs"];
+
+    export type ProjectServiceEvent = ProjectsUpdatedInBackgroundEvent | ConfigFileDiagEvent | ProjectLanguageServiceStateEvent | ProjectInfoTelemetryEvent | OpenFilesInfoTelemetryEvent;
 
     export type ProjectServiceEventHandler = (event: ProjectServiceEvent) => void;
 
@@ -314,6 +330,32 @@ namespace ts.server {
         return project.dirty && project.updateGraph();
     }
 
+    //!
+    /* @internal */
+    export function openFileStatsFileName(globalTypingsCacheLocation: string): string {
+        return combinePaths(globalTypingsCacheLocation, "openFileStats.json");
+    }
+    //!
+    function readOpenFileStats(globalTypingsCacheLocation: string, host: ServerHost): OpenFileStats {
+        //const text = host.readFile(openFileStatsFileName(globalTypingsCacheLocation), "utf-8");
+        const res = readJson(openFileStatsFileName(globalTypingsCacheLocation), host) as OpenFileStats;
+        //Validate result
+        if (!arrayIsEqualTo(Object.keys(res), openFileStatsKeys)) {
+            return undefined;
+        }
+        for (const key in res) {
+            const value = (res as any)[key]; //! i asked nathan why we need the cast...
+            if (typeof value !== "number") {
+                return undefined;
+            }
+        }
+        return res;
+    }
+
+    function writeOpenFileStats(globalTypingsCacheLocation: string, host: ServerHost, stats: OpenFileStats): void {
+        host.writeFile(openFileStatsFileName(globalTypingsCacheLocation), JSON.stringify(stats));
+    }
+
     export class ProjectService {
 
         /*@internal*/
@@ -406,6 +448,8 @@ namespace ts.server {
 
         /*@internal*/
         readonly watchFactory: WatchFactory<WatchType, Project>;
+
+        private hasSentOpenFileTelemetry: boolean;
 
         constructor(opts: ProjectServiceOptions) {
             this.host = opts.host;
@@ -1390,6 +1434,7 @@ namespace ts.server {
             return project;
         }
 
+        //!
         private sendProjectTelemetry(projectKey: string, project: ExternalProject | ConfiguredProject, projectOptions?: ProjectOptions): void {
             if (this.seenProjects.has(projectKey)) {
                 return;
@@ -1400,6 +1445,7 @@ namespace ts.server {
                 return;
             }
 
+            //!!!
             const data: ProjectInfoTelemetryEventData = {
                 projectId: this.host.createHash(projectKey),
                 fileStats: countEachFileTypes(project.getScriptInfos()),
@@ -2005,6 +2051,7 @@ namespace ts.server {
             });
         }
 
+        //!
         openClientFileWithNormalizedPath(fileName: NormalizedPath, fileContent?: string, scriptKind?: ScriptKind, hasMixedContent?: boolean, projectRootPath?: NormalizedPath): OpenConfiguredProjectResult {
             let configFileName: NormalizedPath;
             let configFileErrors: ReadonlyArray<Diagnostic>;
@@ -2083,7 +2130,25 @@ namespace ts.server {
 
             this.printProjects();
 
+            this.telemetryOnOpenFile();
             return { configFileName, configFileErrors };
+        }
+
+        private telemetryOnOpenFile(): void {
+            if (this.hasSentOpenFileTelemetry) {
+                const stats: Mutable<OpenFileStats> = { js: 0, checkJs: 0 };
+                this.filenameToScriptInfo.forEach((scriptInfo) => {
+                    if (!scriptInfo.isJavaScript) return;
+                    stats.js++;
+                    if (hasTsCheck(scriptInfo.getLatestVersion())) stats.checkJs++;
+                });
+                writeOpenFileStats(this.typingsCache.globalTypingsCacheLocation, this.host, stats);
+            } else {
+                const data: OpenFilesInfoTelemetryEventData = {
+                    stats: readOpenFileStats(this.typingsCache.globalTypingsCacheLocation, this.host),
+                }
+                this.eventHandler({ eventName: OpenFilesInfoTelemetryEvent, data });
+            }
         }
 
         /**

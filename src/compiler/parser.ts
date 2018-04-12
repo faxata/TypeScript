@@ -7545,6 +7545,7 @@ namespace ts {
     }
 
     /*@internal*/
+    // Note: Everything but `languageVersion` is an out-parameter.
     export interface PragmaContext {
         languageVersion: ScriptTarget;
         pragmas?: PragmaMap;
@@ -7598,6 +7599,28 @@ namespace ts {
 
     /*@internal*/
     type PragmaDiagnosticReporter = (pos: number, length: number, message: DiagnosticMessage) => void;
+
+    /* @internal */
+    export function hasTsCheck(sourceText: string) {
+        const pragmas = createPragmaContext();
+        processCommentPragmas(pragmas, sourceText);
+        processPragmasIntoFields(pragmas, () => {});
+        return !!pragmas.checkJsDirective;
+    }
+
+    /* @internal */
+    export function createPragmaContext(): PragmaContext {
+        return {
+            languageVersion: ScriptTarget.ES5, // controls whether the token scanner considers unicode identifiers or not - shouldn't matter, since we're only using it for trivia
+            pragmas: undefined,
+            checkJsDirective: undefined,
+            referencedFiles: [],
+            typeReferenceDirectives: [],
+            amdDependencies: [],
+            hasNoDefaultLib: undefined,
+            moduleName: undefined
+        };
+    }
 
     /*@internal*/
     export function processPragmasIntoFields(context: PragmaContext, reportDiagnostic: PragmaDiagnosticReporter): void {
