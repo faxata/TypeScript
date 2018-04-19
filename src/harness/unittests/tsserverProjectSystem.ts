@@ -238,6 +238,9 @@ namespace ts.projectSystem {
         assertOpenFilesTelemetryEvent(stats: server.OpenFileStats): void {
             assert.deepEqual<server.OpenFilesInfoTelemetryEventData>(this.getEvent<server.OpenFilesInfoTelemetryEvent>(server.OpenFilesInfoTelemetryEvent), { stats });
         }
+        assertNoOpenFilesTelemetryEvent(): void {
+            this.hasZeroEvent<server.OpenFilesInfoTelemetryEvent>(server.OpenFilesInfoTelemetryEvent);
+        }
     }
 
     class TestSession extends server.Session {

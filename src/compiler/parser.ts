@@ -7545,7 +7545,6 @@ namespace ts {
     }
 
     /*@internal*/
-    // Note: Everything but `languageVersion` is an out-parameter.
     export interface PragmaContext {
         languageVersion: ScriptTarget;
         pragmas?: PragmaMap;
@@ -7601,7 +7600,7 @@ namespace ts {
     type PragmaDiagnosticReporter = (pos: number, length: number, message: DiagnosticMessage) => void;
 
     /* @internal */
-    export function hasTsCheck(sourceText: string) {
+    export function hasTsCheck(sourceText: string): boolean {
         const pragmas = createPragmaContext();
         processCommentPragmas(pragmas, sourceText);
         processPragmasIntoFields(pragmas, () => {});

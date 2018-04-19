@@ -336,7 +336,7 @@ namespace ts.server {
         return combinePaths(globalTypingsCacheLocation, "openFileStats.json");
     }
     //!
-    function readOpenFileStats(globalTypingsCacheLocation: string, host: ServerHost): OpenFileStats {
+    function tryReadOpenFileStats(globalTypingsCacheLocation: string, host: ServerHost): OpenFileStats {
         //const text = host.readFile(openFileStatsFileName(globalTypingsCacheLocation), "utf-8");
         const res = readJson(openFileStatsFileName(globalTypingsCacheLocation), host) as OpenFileStats;
         //Validate result
@@ -2137,17 +2137,20 @@ namespace ts.server {
         private telemetryOnOpenFile(): void {
             if (this.hasSentOpenFileTelemetry) {
                 const stats: Mutable<OpenFileStats> = { js: 0, checkJs: 0 };
-                this.filenameToScriptInfo.forEach((scriptInfo) => {
+                this.filenameToScriptInfo.forEach(scriptInfo => {
                     if (!scriptInfo.isJavaScript) return;
                     stats.js++;
-                    if (hasTsCheck(scriptInfo.getLatestVersion())) stats.checkJs++;
+                    BELOW DOES NOT WORK;
+                    const fileContent = getSnapshotText(scriptInfo.getSnapshot());
+                    if (hasTsCheck(fileContent)) stats.checkJs++;
                 });
                 writeOpenFileStats(this.typingsCache.globalTypingsCacheLocation, this.host, stats);
             } else {
-                const data: OpenFilesInfoTelemetryEventData = {
-                    stats: readOpenFileStats(this.typingsCache.globalTypingsCacheLocation, this.host),
+                this.hasSentOpenFileTelemetry = true;
+                const stats = tryReadOpenFileStats(this.typingsCache.globalTypingsCacheLocation, this.host);
+                if (stats) {
+                    this.eventHandler({ eventName: OpenFilesInfoTelemetryEvent, data: { stats } });
                 }
-                this.eventHandler({ eventName: OpenFilesInfoTelemetryEvent, data });
             }
         }
 

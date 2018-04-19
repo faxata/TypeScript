@@ -238,12 +238,25 @@ namespace ts.projectSystem {
         it("aaa", () => { //name
             //const ajs = makeFile("/a.js", "// @ts-check");
             //const bjs = makeFile("/b.js", "");
-            const et = new TestServerEventManager([]);//[ajs, bjs]);
-            et.host.writeFile(ts.server.openFileStatsFileName("/global-typings-cache"), JSON.stringify({ js: 13, checkJs: 10 }));
+            const ajs = makeFile("/a.js", "// @ts-check\nconst x = 0;");
+            const bjs = makeFile("/b.js");
+            const et = new TestServerEventManager([ajs, bjs]);//[ajs, bjs]);
+            const globalTypingsCache = et.service.typingsCache.globalTypingsCacheLocation;
+            et.host.createDirectoryRecursively(globalTypingsCache);
+            et.host.writeFile(server.openFileStatsFileName(globalTypingsCache), JSON.stringify({ js: 13, checkJs: 10 }));
             //et.service.openClientFile(ajs.path);
             //et.service.openClientFile(bjs.path);
-            et.getEvent<server.ProjectLanguageServiceStateEvent>(server.ProjectLanguageServiceStateEvent);
+
+            // Must open a file for the event to be sent.
+            et.service.openClientFile(ajs.path);
+            //et.getEvent<server.ProjectLanguageServiceStateEvent>(server.ProjectLanguageServiceStateEvent);
             et.assertOpenFilesTelemetryEvent({ js: 13, checkJs: 10 });
+
+            et.service.openClientFile(bjs.path);
+            //et.getEvent<server.ProjectLanguageServiceStateEvent>(server.ProjectLanguageServiceStateEvent);
+            et.assertNoOpenFilesTelemetryEvent();
+            //Should have written new contents.
+            assert.deepEqual(JSON.parse(et.host.readFile(server.openFileStatsFileName(globalTypingsCache))), { js: 2, checkJs: 1 });
         });
     });
 
